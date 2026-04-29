@@ -2,26 +2,38 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+EDU PORTAL — a complete educational platform for teachers and students (classes 6–12), built as a React + Vite single-page app backed by Firebase Firestore.
 
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **Node.js**: 24
+- **TypeScript**: 5.9
+- **Frontend**: React 19 + Vite + react-router-dom + framer-motion + recharts + Tailwind v4 + shadcn UI
+- **Database**: Firebase Firestore (real-time `onSnapshot` listeners everywhere)
+- **Auth**: custom phone + password (SHA-256 hash) with simulated SMS OTP
+
+## Key Files
+
+- `artifacts/edu-portal/src/lib/firebase.ts` — Firebase config (paste your keys here OR use `VITE_FIREBASE_*` env vars).
+- `artifacts/edu-portal/src/lib/auth.tsx` — custom auth + AuthProvider context.
+- `artifacts/edu-portal/.env.example` — template for env-based Firebase config.
+- `artifacts/edu-portal/vercel.json` — SPA rewrite rules for Vercel.
+
+## Firestore Collections
+
+- `users` · `exams` · `questionBank` · `results` · `notifications` · `otps`
 
 ## Key Commands
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+- `pnpm --filter @workspace/edu-portal run dev` — run EDU PORTAL locally
+- `pnpm --filter @workspace/edu-portal run build` — production build (output: `artifacts/edu-portal/dist/public`)
 
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+## Deployment
+
+- Vercel-ready. Build command `pnpm --filter @workspace/edu-portal run build`, output dir `artifacts/edu-portal/dist/public`. `vercel.json` handles SPA fallback.
+- `vite.config.ts` no longer requires `PORT` / `BASE_PATH` env vars — they default for Vercel builds.
+
+## Firestore Security Rules
+
+See the comment block at the bottom of `artifacts/edu-portal/src/lib/firebase.ts` — copy it into Firebase Console → Firestore → Rules.
