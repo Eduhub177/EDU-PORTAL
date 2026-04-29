@@ -9,6 +9,8 @@ import { requestSignupOtp } from "@/lib/auth"; // Reuse the same OTP func for de
 import { toast } from "sonner";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import AnimatedBg from "@/components/animated-bg";
+import Particles from "@/components/particles";
 
 export default function ForgotPassword() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -60,9 +62,15 @@ export default function ForgotPassword() {
 
   return (
     <div className="flex-1 flex items-center justify-center p-4 relative overflow-hidden bg-background">
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-accent/10 via-background to-background"></div>
-      
-      <div className="w-full max-w-md glass p-8 rounded-2xl relative z-10 overflow-hidden">
+      <AnimatedBg />
+      <Particles count={20} />
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+        className="w-full max-w-md glass p-8 rounded-2xl relative z-10 overflow-hidden animate-glow-pulse"
+      >
         <div className="flex flex-col items-center mb-6">
           <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4">
             <BookOpen className="w-6 h-6 text-primary-foreground" />
@@ -124,7 +132,7 @@ export default function ForgotPassword() {
            </motion.form>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
     </div>
   );
 }

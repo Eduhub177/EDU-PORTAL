@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BookOpen, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import AnimatedBg from "@/components/animated-bg";
+import Particles from "@/components/particles";
 import { toast } from "sonner";
 import { getDocs, query, collection, where } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
@@ -62,12 +64,14 @@ export default function Login() {
 
   return (
     <div className="flex-1 flex items-center justify-center p-4 relative overflow-hidden bg-background">
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-background to-background"></div>
-      
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md glass p-8 rounded-2xl relative z-10"
+      <AnimatedBg />
+      <Particles count={24} />
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+        className="w-full max-w-md glass p-8 rounded-2xl relative z-10 animate-glow-pulse"
       >
         <div className="flex flex-col items-center mb-8">
           <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4">
