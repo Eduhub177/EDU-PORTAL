@@ -7,10 +7,7 @@ const port = process.env.PORT ? Number(process.env.PORT) : 5173;
 
 export default defineConfig({
   base: "/",
-  plugins: [
-    react(),
-    tailwindcss(),
-  ],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
@@ -19,8 +16,9 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist"),
+    outDir: path.resolve(import.meta.dirname, "dist\public"),
     emptyOutDir: true,
+    sourcemap: false,
   },
   server: {
     host: "0.0.0.0",
