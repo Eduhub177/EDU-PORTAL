@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,9 @@ export default function Signup() {
   const navigate = useNavigate();
 
   // Form State
-  const [role, setRole] = useState<"student" | "teacher">("student");
+  const [searchParams] = useSearchParams();
+  const initialRole = searchParams.get("role") === "teacher" ? "teacher" : "student";
+  const [role, setRole] = useState<"student" | "teacher">(initialRole);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");

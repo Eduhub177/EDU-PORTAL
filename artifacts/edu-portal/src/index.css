@@ -176,3 +176,31 @@
 .animate-spin-slow {
   animation: spin-slow 30s linear infinite;
 }
+
+/* ---------- Water ripple (concentric expanding rings) ---------- */
+@keyframes ripple {
+  0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 0.65; }
+  80%  { opacity: 0.05; }
+  100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+}
+.animate-ripple {
+  animation: ripple 4s cubic-bezier(0.2, 0.7, 0.4, 1) infinite;
+}
+
+/* ---------- Logo orbit (badge gentle bob) ---------- */
+@keyframes logo-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-6px) rotate(2deg); }
+}
+.animate-logo-bob {
+  animation: logo-bob 5s ease-in-out infinite;
+}
+
+/* ---------- Marquee (slower, used in hero ticker) ---------- */
+@keyframes marquee-slow {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-marquee-slow {
+  animation: marquee-slow 35s linear infinite;
+}
