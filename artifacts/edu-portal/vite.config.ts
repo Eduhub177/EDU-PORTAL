@@ -9,8 +9,25 @@ const port = rawPort ? Number(rawPort) : 5173;
 
 const basePath = process.env.BASE_PATH || "/";
 
+const FIREBASE_ENV_KEYS = [
+  "VITE_FIREBASE_API_KEY",
+  "VITE_FIREBASE_AUTH_DOMAIN",
+  "VITE_FIREBASE_PROJECT_ID",
+  "VITE_FIREBASE_STORAGE_BUCKET",
+  "VITE_FIREBASE_MESSAGING_SENDER_ID",
+  "VITE_FIREBASE_APP_ID",
+] as const;
+
+const firebaseDefines = Object.fromEntries(
+  FIREBASE_ENV_KEYS.map((key) => [
+    `import.meta.env.${key}`,
+    JSON.stringify(process.env[key] ?? ""),
+  ]),
+);
+
 export default defineConfig({
   base: basePath,
+  define: firebaseDefines,
   plugins: [
     react(),
     tailwindcss(),

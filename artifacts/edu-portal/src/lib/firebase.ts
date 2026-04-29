@@ -14,32 +14,40 @@ import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/a
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+const env = import.meta.env;
+
 const firebaseConfig: FirebaseOptions = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "PASTE_YOUR_API_KEY_HERE",
-  authDomain:
-    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
-    "PASTE_YOUR_PROJECT.firebaseapp.com",
-  projectId:
-    import.meta.env.VITE_FIREBASE_PROJECT_ID || "PASTE_YOUR_PROJECT_ID",
-  storageBucket:
-    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
-    "PASTE_YOUR_PROJECT.appspot.com",
-  messagingSenderId:
-    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ||
-    "PASTE_YOUR_SENDER_ID",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "PASTE_YOUR_APP_ID",
+  apiKey: env.VITE_FIREBASE_API_KEY ?? "",
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN ?? "",
+  projectId: env.VITE_FIREBASE_PROJECT_ID ?? "",
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET ?? "",
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? "",
+  appId: env.VITE_FIREBASE_APP_ID ?? "",
 };
 
-export const isFirebaseConfigured =
-  !firebaseConfig.apiKey?.startsWith("PASTE_") &&
-  !firebaseConfig.projectId?.startsWith("PASTE_");
+const hasAllKeys = Boolean(
+  firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId,
+);
 
-export const firebaseApp = getApps().length
-  ? getApp()
-  : initializeApp(firebaseConfig);
+export const isFirebaseConfigured = hasAllKeys;
 
-export const db = getFirestore(firebaseApp);
-export const storage = getStorage(firebaseApp);
+export const firebaseApp = hasAllKeys
+  ? getApps().length
+    ? getApp()
+    : initializeApp(firebaseConfig)
+  : (null as never);
+
+export const db = hasAllKeys ? getFirestore(firebaseApp) : (null as never);
+export const storage = hasAllKeys ? getStorage(firebaseApp) : (null as never);
+
+if (hasAllKeys) {
+  console.info("[Firebase] initialized for project:", firebaseConfig.projectId);
+} else {
+  console.warn("[Firebase] missing VITE_FIREBASE_* env vars — real-time features disabled");
+}
 
 // =============================================================
 // FIRESTORE SECURITY RULES (paste in Firebase Console → Firestore → Rules)
