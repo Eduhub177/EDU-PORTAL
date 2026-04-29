@@ -1,12 +1,24 @@
 import { useState } from "react";
-import { Plus, Save, Send, Clock, Trash2, ArrowUpDown } from "lucide-react";
+import { Plus, Save, Send, Clock, Trash2, ArrowUpDown, Infinity as InfinityIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const TIMER_PRESETS = [10, 15, 30, 45, 60, 90, 120];
+
+function formatDuration(mins: number): string {
+  if (!mins || mins <= 0) return "—";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h && m) return `${h}h ${m}m`;
+  if (h) return `${h}h`;
+  return `${m}m`;
+}
 
 export default function CreateExam() {
   const { user } = useAuth();
@@ -14,6 +26,8 @@ export default function CreateExam() {
   const [subject, setSubject] = useState(user?.subjects?.[0] || "");
   const [classLevel, setClassLevel] = useState("9");
   const [duration, setDuration] = useState("30");
+  const [timerEnabled, setTimerEnabled] = useState(true);
+  const [autoSubmit, setAutoSubmit] = useState(true);
   const [passingPercent, setPassingPercent] = useState("40");
   const [password, setPassword] = useState("");
   const [questions, setQuestions] = useState<any[]>([]);
@@ -71,16 +85,90 @@ export default function CreateExam() {
           </select>
         </div>
         <div className="space-y-2">
-          <Label>Duration (Minutes)</Label>
-          <Input type="number" value={duration} onChange={e => setDuration(e.target.value)} />
-        </div>
-        <div className="space-y-2">
           <Label>Passing Percentage (%)</Label>
           <Input type="number" value={passingPercent} onChange={e => setPassingPercent(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label>Exam Password (for students)</Label>
           <Input value={password} onChange={e => setPassword(e.target.value)} placeholder="Leave blank for open exam" />
+        </div>
+
+        <div className="md:col-span-2 mt-2 p-5 rounded-xl border border-primary/30 bg-primary/5 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${timerEnabled ? "bg-primary/20 text-primary animate-glow-pulse" : "bg-muted text-muted-foreground"}`}>
+                {timerEnabled ? <Clock className="w-5 h-5" /> : <InfinityIcon className="w-5 h-5" />}
+              </div>
+              <div>
+                <p className="font-semibold">{timerEnabled ? "Timed Exam" : "Untimed Exam"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {timerEnabled
+                    ? `Students get ${formatDuration(parseInt(duration) || 0)} to finish`
+                    : "Students can take as long as they want"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="timer-toggle" className="text-sm cursor-pointer">Enable timer</Label>
+              <Switch
+                id="timer-toggle"
+                checked={timerEnabled}
+                onCheckedChange={setTimerEnabled}
+                data-testid="switch-timer-enabled"
+              />
+            </div>
+          </div>
+
+          {timerEnabled && (
+            <>
+              <div className="space-y-2">
+                <Label>Duration (Minutes)</Label>
+                <div className="flex flex-wrap gap-2">
+                  {TIMER_PRESETS.map((min) => (
+                    <button
+                      key={min}
+                      type="button"
+                      onClick={() => setDuration(String(min))}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-all hover-elevate ${
+                        parseInt(duration) === min
+                          ? "border-primary bg-primary text-primary-foreground shadow-[0_0_12px_rgba(124,58,237,0.5)]"
+                          : "border-border bg-background/50 text-muted-foreground hover:text-foreground"
+                      }`}
+                      data-testid={`button-preset-${min}`}
+                    >
+                      {formatDuration(min)}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3 mt-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={600}
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    className="w-32"
+                    data-testid="input-duration"
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    minutes total · <span className="text-foreground font-medium">{formatDuration(parseInt(duration) || 0)}</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">Auto-submit when time runs out</p>
+                  <p className="text-xs text-muted-foreground">Recommended for fair grading</p>
+                </div>
+                <Switch
+                  checked={autoSubmit}
+                  onCheckedChange={setAutoSubmit}
+                  data-testid="switch-auto-submit"
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
