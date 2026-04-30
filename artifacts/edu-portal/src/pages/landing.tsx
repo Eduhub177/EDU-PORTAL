@@ -19,9 +19,9 @@ const EDUCATORS = [
   {
     initials: "MKS",
     name: "Mrinal Kanti Shib",
-    title: "Senior Educator",
+    title: "Best Educator",
     years: "25+ Years",
-    subjects: ["Science", "Mathematics"],
+    subjects: ["English", "Social Science"],
     quote: "Shaping minds, building futures.",
     glow: "from-primary/40 via-purple-500/30 to-accent/30",
     ring: "ring-primary/40",
@@ -29,9 +29,9 @@ const EDUCATORS = [
   {
     initials: "TKS",
     name: "Tarun Kanti Shib",
-    title: "Lead Educator",
+    title: "Best Educator",
     years: "15+ Years",
-    subjects: ["English", "Social Science"],
+    subjects: ["Science", "Math"],
     quote: "Every student has the potential to excel.",
     glow: "from-cyan-500/40 via-accent/30 to-primary/30",
     ring: "ring-accent/40",
