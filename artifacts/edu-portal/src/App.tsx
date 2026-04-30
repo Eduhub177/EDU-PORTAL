@@ -74,8 +74,9 @@ function App() {
                       <Route path="/student/results/:id" element={<ResultDetail />} />
                     </Route>
                   </Route>
-                  
+
                   <Route path="/exam/:examId" element={<TakeExam />} />
+                  <Route path="/student/exam/:examId" element={<TakeExam />} />
                 </Route>
                 
                 <Route path="*" element={<NotFound />} />
