@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { BookOpen, Trophy, Activity, GraduationCap, Users, Sparkles, Star } from "lucide-react";
+import { BookOpen, Trophy, Activity, GraduationCap, Users, Sparkles, Award } from "lucide-react";
 import Particles from "@/components/particles";
 import AnimatedBg from "@/components/animated-bg";
 import WaterRipple from "@/components/water-ripple";
@@ -15,17 +15,27 @@ const wordVariants = {
   show: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.55, ease: [0.2, 0.8, 0.2, 1] as const } },
 };
 
-const TOPPERS = [
-  { name: "Aanya Sharma", score: 100, subject: "Physics", cls: 11 },
-  { name: "Rohan Verma", score: 98, subject: "Mathematics", cls: 12 },
-  { name: "Maria S.", score: 97, subject: "Chemistry", cls: 10 },
-  { name: "Aditya Patel", score: 96, subject: "Biology", cls: 9 },
-  { name: "Sara Khan", score: 95, subject: "Computer Science", cls: 11 },
-  { name: "John D.", score: 94, subject: "English", cls: 8 },
-  { name: "Priya R.", score: 93, subject: "History", cls: 7 },
-  { name: "Kabir M.", score: 92, subject: "Geography", cls: 12 },
-  { name: "Isha Gupta", score: 91, subject: "Physics", cls: 10 },
-  { name: "Arjun S.", score: 90, subject: "Mathematics", cls: 9 },
+const EDUCATORS = [
+  {
+    initials: "MKS",
+    name: "Mrinal Kanti Shib",
+    title: "Senior Educator",
+    years: "25+ Years",
+    subjects: ["Science", "Mathematics"],
+    quote: "Shaping minds, building futures.",
+    glow: "from-primary/40 via-purple-500/30 to-accent/30",
+    ring: "ring-primary/40",
+  },
+  {
+    initials: "TKS",
+    name: "Tarun Kanti Shib",
+    title: "Lead Educator",
+    years: "15+ Years",
+    subjects: ["English", "Social Science"],
+    quote: "Every student has the potential to excel.",
+    glow: "from-cyan-500/40 via-accent/30 to-primary/30",
+    ring: "ring-accent/40",
+  },
 ];
 
 export default function Landing() {
@@ -117,24 +127,6 @@ export default function Landing() {
             ))}
           </motion.h1>
 
-          {/* === SCROLLING TOPPERS UNDER TITLE === */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7, duration: 0.5 }}
-            className="w-full max-w-5xl mb-8 relative"
-          >
-            <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
-            <div className="overflow-hidden py-2">
-              <div className="flex w-max animate-marquee-slow gap-3">
-                {[...TOPPERS, ...TOPPERS].map((s, i) => (
-                  <TopperChip key={i} {...s} />
-                ))}
-              </div>
-            </div>
-          </motion.div>
-
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -202,6 +194,69 @@ export default function Landing() {
             </Link>
           </motion.p>
 
+          {/* === MEET OUR EDUCATORS === */}
+          <section className="w-full max-w-5xl mb-16 mt-4">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.55 }}
+              className="text-center mb-8"
+            >
+              <h2 className="text-3xl md:text-4xl font-display font-bold bg-gradient-to-r from-primary via-purple-300 to-accent bg-clip-text text-transparent">
+                Meet Our Educators
+              </h2>
+              <p className="text-muted-foreground mt-2 text-sm md:text-base">
+                Decades of teaching experience, distilled into one platform.
+              </p>
+            </motion.div>
+
+            <div className="grid md:grid-cols-2 gap-6 relative">
+              {/* Floating decorative orbs */}
+              <div className="pointer-events-none absolute -top-8 left-8 w-40 h-40 rounded-full bg-primary/20 blur-3xl animate-float-y" />
+              <div className="pointer-events-none absolute -bottom-8 right-8 w-44 h-44 rounded-full bg-accent/20 blur-3xl animate-float-y" style={{ animationDelay: "1.2s" }} />
+              <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 rounded-full bg-purple-500/15 blur-2xl animate-float-y" style={{ animationDelay: "0.6s" }} />
+
+              {EDUCATORS.map((ed, i) => (
+                <motion.div
+                  key={ed.initials}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ delay: i * 0.15, duration: 0.55, ease: [0.2, 0.8, 0.2, 1] }}
+                  whileHover={{ y: -6 }}
+                  className="glass tilt-hover relative p-6 md:p-7 rounded-2xl text-left overflow-hidden"
+                  data-testid={`card-educator-${ed.initials}`}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-br ${ed.glow} opacity-30 pointer-events-none`} />
+                  <div className="relative flex items-start gap-4">
+                    <div className={`shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-primary via-purple-500 to-accent flex items-center justify-center font-display font-bold text-xl md:text-2xl text-white ring-2 ${ed.ring} shadow-[0_0_25px_rgba(124,58,237,0.4)]`}>
+                      {ed.initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-display font-semibold text-lg md:text-xl">{ed.name}</h3>
+                      <p className="text-sm text-primary">{ed.title}</p>
+                      <p className="inline-flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                        <Award className="w-3 h-3 text-amber-400" />
+                        {ed.years}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="relative mt-4 flex flex-wrap gap-2">
+                    {ed.subjects.map((s) => (
+                      <span key={s} className="text-xs px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="relative mt-4 italic text-sm md:text-base text-foreground/90 leading-relaxed">
+                    “{ed.quote}”
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+
           {/* === FEATURE CARDS === */}
           <div className="grid md:grid-cols-3 gap-6 w-full max-w-5xl">
             <FeatureCard
@@ -264,26 +319,3 @@ function FeatureCard({
   );
 }
 
-function TopperChip({
-  name,
-  score,
-  subject,
-  cls,
-}: {
-  name: string;
-  score: number;
-  subject: string;
-  cls: number;
-}) {
-  return (
-    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border border-white/5 whitespace-nowrap">
-      <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-      <span className="text-sm font-semibold">{name}</span>
-      <span className="text-xs text-muted-foreground">scored</span>
-      <span className="text-sm font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-        {score}%
-      </span>
-      <span className="text-xs text-muted-foreground">in {subject} · Class {cls}</span>
-    </div>
-  );
-}

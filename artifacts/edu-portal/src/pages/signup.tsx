@@ -9,6 +9,7 @@ import { BookOpen, Loader2, GraduationCap, Users } from "lucide-react";
 import { requestSignupOtp, hashPassword } from "@/lib/auth";
 import AnimatedBg from "@/components/animated-bg";
 import Particles from "@/components/particles";
+import { SUBJECTS, CLASS_LEVELS } from "@/lib/constants";
 import { toast } from "sonner";
 import { doc, setDoc, serverTimestamp, collection } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
@@ -27,6 +28,12 @@ export default function Signup() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [classLevel, setClassLevel] = useState("9");
+  const [teacherSubjects, setTeacherSubjects] = useState<string[]>([]);
+
+  const toggleSubject = (s: string) =>
+    setTeacherSubjects((prev) =>
+      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s],
+    );
   
   // OTP State
   const [otp, setOtp] = useState("");
@@ -63,7 +70,9 @@ export default function Signup() {
         phone,
         role,
         passwordHash: hashed,
-        ...(role === "student" ? { classLevel: parseInt(classLevel, 10) } : { subjects: ["Mathematics", "Science"] }),
+        ...(role === "student"
+          ? { classLevel: parseInt(classLevel, 10) }
+          : { subjects: teacherSubjects.length ? teacherSubjects : [...SUBJECTS] }),
         createdAt: serverTimestamp(),
         streak: 0
       });
@@ -147,13 +156,41 @@ export default function Signup() {
               {role === "student" && (
                 <div className="space-y-2">
                   <Label>Class</Label>
-                  <select 
+                  <select
                     className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     value={classLevel}
                     onChange={(e) => setClassLevel(e.target.value)}
                   >
-                    {[6,7,8,9,10,11,12].map(c => <option key={c} value={c}>Class {c}</option>)}
+                    {CLASS_LEVELS.map((c) => (
+                      <option key={c} value={c}>Class {c}</option>
+                    ))}
                   </select>
+                </div>
+              )}
+
+              {role === "teacher" && (
+                <div className="space-y-2">
+                  <Label>Subjects you teach <span className="text-muted-foreground text-xs">(pick one or more)</span></Label>
+                  <div className="max-h-40 overflow-y-auto p-2 rounded-md border border-input bg-background/40 grid grid-cols-2 gap-1">
+                    {SUBJECTS.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => toggleSubject(s)}
+                        className={`text-xs text-left px-2 py-1.5 rounded transition-colors ${
+                          teacherSubjects.includes(s)
+                            ? "bg-accent text-accent-foreground font-medium"
+                            : "hover:bg-muted text-muted-foreground"
+                        }`}
+                        data-testid={`button-subject-${s.replace(/\s/g, "-")}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  {teacherSubjects.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Leave empty to enable all subjects.</p>
+                  )}
                 </div>
               )}
 

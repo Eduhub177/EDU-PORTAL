@@ -1,0 +1,206 @@
+Update the existing EDU PORTAL with these 
+specific fixes and additions only. Do NOT 
+rebuild anything that already works:
+
+---
+
+🔧 UPDATE 1 — FIX QUESTION CREATION TOOL:
+
+The current question adding tool is broken. 
+Fix it with these exact features:
+
+a) QUESTION COUNT SELECTOR:
+Add a selector BEFORE questions start:
+"How many questions do you want to add?"
+Buttons: 5 | 10 | 15 | 20 | 25 | 30 | Custom
+After selecting a number, automatically generate 
+that many empty question slides ready to fill in.
+Show at top: "Question 1 of 10" with progress bar.
+
+b) SLIDE NAVIGATION:
+Show ONE question at a time as a slide.
+Add "← Previous" and "Next →" buttons at bottom.
+Add numbered dots at top to jump to any question.
+Last slide shows "Review & Publish" instead of Next.
+
+c) IMAGE UPLOAD on each question slide:
+Two buttons side by side:
+📁 "Choose from Library" — opens file picker
+   (accepts jpg, png, webp)
+📷 "Take Photo" — opens device camera directly
+   (rear-facing on mobile by default)
+After selecting: show image preview with × remove.
+
+d) PRE-LABELED OPTIONS:
+Each question must have exactly 4 option rows:
+
+🔵 A │ [editable text input] │ ○ (mark correct)
+🟢 B │ [editable text input] │ ○ (mark correct)
+🟠 C │ [editable text input] │ ○ (mark correct)
+🔴 D │ [editable text input] │ ○ (mark correct)
+
+Rules:
+- A B C D labels are fixed, cannot be removed
+- Left border colors: A=blue, B=green, 
+  C=orange, D=red
+- Text fields fully editable
+- Radio button on RIGHT to mark correct answer
+- When radio selected → row glows soft green
+- Only ONE option can be correct at a time
+
+e) AUTO-SAVE:
+Auto-save each question as teacher fills it.
+Show small "Saved ✓" text after saving.
+
+---
+
+🔧 UPDATE 2 — ADD ALL 20 SUBJECTS:
+Replace current limited subjects list with 
+ALL of these everywhere in the app:
+English, Mathematics, Science, Social Science,
+Hindi, Bengali, Sanskrit, Physics, Chemistry,
+Biology, History, Geography, Civics, Economics,
+Computer Science, Physical Education, Art, Music,
+Environmental Science, Moral Science
+
+---
+
+🔧 UPDATE 3 — EXAM DRAFT & PUBLISH SYSTEM:
+
+Add complete draft management to teacher dashboard:
+
+a) SAVE AS DRAFT button:
+When creating exam add two buttons:
+"💾 Save as Draft" — saves to Firestore 
+  with status: "draft"
+"🚀 Publish Exam" — saves with status: "published"
+
+b) MY EXAMS section — add TWO tabs:
+
+TAB 1 — "📁 Drafts":
+Shows count: "📁 Drafts (3)"
+Each draft card shows:
+- Exam title, Subject, Class
+- Number of questions
+- Date created
+- Yellow "Draft" status badge
+- Three buttons:
+  ✏️ Edit — opens exam editor with saved questions
+  🚀 Publish — publishes immediately
+  🗑️ Delete — with confirmation dialog
+
+TAB 2 — "✅ Published":
+Shows count: "✅ Published (5)"
+Each published card shows:
+- Exam title, Subject, Class
+- Questions count
+- Exam password
+- Date published
+- How many students attempted
+- Green "Published" badge
+- Three buttons:
+  📤 Move to Draft — unpublishes exam
+  👁️ View Results — shows student results
+  🗑️ Delete — with confirmation dialog
+
+c) PUBLISH FLOW:
+Draft → Published:
+- Change Firestore status to "published"
+- Show toast: "Exam published! Students can now 
+  see this exam"
+- Card moves to Published tab
+
+Published → Draft:
+- Show confirmation dialog:
+  "Move to drafts? Students will no longer 
+   see this exam."
+- On confirm: change status to "draft"
+- Show toast: "Exam moved to drafts"
+- Card moves to Drafts tab
+
+d) DELETE FLOW:
+Show confirmation dialog:
+"Delete '[Exam Title]'? This will also delete 
+all student results. This cannot be undone."
+Buttons: Cancel | Delete Permanently (red)
+On confirm: delete exam AND results from Firestore
+Show toast: "Exam deleted"
+
+e) EDIT DRAFT:
+Opens question creation interface
+All previously saved questions load back
+Teacher can edit/add/delete questions
+Save updates the draft in Firestore
+
+---
+
+✨ UPDATE 4 — FEATURED TEACHERS CARDS 
+ON LANDING PAGE:
+
+Add a new section on the landing page BETWEEN 
+the hero section and login cards.
+
+Section title: "Meet Our Educators"
+(gradient text purple→cyan with glow underline)
+
+Add TWO glassmorphism cards side by side:
+
+CARD 1:
+- Large avatar circle with initials "MKS" 
+  (purple to cyan gradient background)
+- Name: Mrinal Kanti Shib
+- Title: Senior Educator  
+- Gold badge: "25+ Years of Teaching Excellence"
+- Subject tags: Science | Mathematics
+- Quote (italic): "Shaping minds, building futures"
+- Star rating: ⭐⭐⭐⭐⭐
+
+CARD 2:
+- Large avatar circle with initials "TKS"
+  (cyan to purple gradient background)
+- Name: Tarun Kanti Shib
+- Title: Lead Educator
+- Gold badge: "15+ Years of Teaching Excellence"  
+- Subject tags: English | Social Science
+- Quote (italic): 
+  "Every student has the potential to excel"
+- Star rating: ⭐⭐⭐⭐⭐
+
+CARD STYLING:
+- Glassmorphism: frosted glass dark background
+- Glowing purple/cyan border
+- Hover: lift up + brighter glow effect
+- Entrance animation: slide up + fade in
+- Side by side on desktop, stacked on mobile
+
+BACKGROUND of this section:
+- 6-8 floating glowing orbs (purple + cyan)
+- Orbs slowly drift and pulse
+- Subtle animated gradient background
+- Section has slight dark overlay for depth
+
+---
+
+🚫 UPDATE 5 — REMOVE ALL FAKE DATA:
+Remove every single piece of hardcoded 
+fake/demo data:
+- No fake student names anywhere
+- No fake exam results
+- No fake "148 students gave exam" stats
+- No fake leaderboard entries
+- No fake numbers or counts
+All data must come from Firebase Firestore only.
+Replace with empty state messages:
+- "No exams yet"
+- "No results yet" 
+- "No students yet"
+- "Complete 5 exams to appear on leaderboard!"
+
+---
+
+After all updates are done:
+1. Commit all changes with message 
+   "Add question tool fix, draft system, 
+   teacher cards, remove fake data"
+2. Push to GitHub
+3. Vercel will auto-deploy ✅
