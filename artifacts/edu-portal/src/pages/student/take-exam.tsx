@@ -1,133 +1,604 @@
-import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Play, Clock, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { Play, Clock, AlertTriangle, ChevronLeft, ChevronRight, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { subjectColor } from "@/lib/utils";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { useAuth } from "@/lib/auth";
 
-// Dummy exam data
-const dummyExam = {
-  id: "1",
-  title: "Physics Midterm",
-  subject: "Physics",
-  durationMinutes: 30,
-  questions: [
-    { id: "q1", text: "What is the speed of light?", options: { A: "3x10^8 m/s", B: "3x10^6 m/s", C: "3x10^10 m/s", D: "3x10^5 m/s" } },
-    { id: "q2", text: "Force equals mass times...", options: { A: "Velocity", B: "Acceleration", C: "Time", D: "Distance" } }
-  ]
+const OPTION_LABELS = ["A", "B", "C", "D"] as const;
+const OPTION_COLORS = {
+  A: "border-blue-500/60 bg-blue-500/5",
+  B: "border-emerald-500/60 bg-emerald-500/5",
+  C: "border-orange-500/60 bg-orange-500/5",
+  D: "border-red-500/60 bg-red-500/5",
+};
+const OPTION_CHIPS = {
+  A: "bg-blue-500",
+  B: "bg-emerald-500",
+  C: "bg-orange-500",
+  D: "bg-red-500",
 };
 
+interface Question {
+  text: string;
+  imageUrl?: string;
+  options: [string, string, string, string];
+  correctIndex: number;
+  shuffledOptions?: string[];
+  shuffledCorrectIndex?: number;
+}
+
+interface Exam {
+  id: string;
+  title: string;
+  subject: string;
+  classLevel: number;
+  duration: number;
+  timerEnabled: boolean;
+  autoSubmit: boolean;
+  examPassword?: string;
+  questions: Question[];
+  teacherId: string;
+  teacherName: string;
+}
+
+// Fisher-Yates shuffle with seed
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  const result = [...arr];
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  for (let i = result.length - 1; i > 0; i--) {
+    hash = ((hash * 1664525) + 1013904223) | 0;
+    const j = Math.abs(hash) % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 export default function TakeExam() {
-  const { examId } = useParams();
+  const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [exam, setExam] = useState<Exam | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Password
+  const [needsPassword, setNeedsPassword] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
+  // Exam flow
   const [started, setStarted] = useState(false);
   const [currentQ, setCurrentQ] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [timeLeft, setTimeLeft] = useState(dummyExam.durationMinutes * 60);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [score, setScore] = useState<{ correct: number; total: number } | null>(null);
 
-  const handleStart = () => {
-    setStarted(true);
-    // In real app, we'd start timer and register visibility handlers
-  };
+  // Violation tracking
+  const violationCountRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleSelectOption = (opt: string) => {
-    setAnswers({ ...answers, [dummyExam.questions[currentQ].id]: opt });
-  };
+  // Load exam from Firestore
+  useEffect(() => {
+    async function loadExam() {
+      if (!examId) { setError("No exam ID provided"); setLoading(false); return; }
+      try {
+        const snap = await getDoc(doc(db, "exams", examId));
+        if (!snap.exists()) { setError("Exam not found"); setLoading(false); return; }
+        const data = snap.data() as any;
+        if (data.status !== "published") { setError("This exam is not available"); setLoading(false); return; }
 
-  const handleSubmit = () => {
-    toast.success("Exam submitted successfully!");
-    navigate("/student/results/dummy");
-  };
+        // Shuffle questions and options per student
+        const seed = (user?.id || "anon") + examId;
+        const shuffledQuestions = seededShuffle(
+          data.questions.map((q: any, origIdx: number) => {
+            const opts = [q.options[0], q.options[1], q.options[2], q.options[3]];
+            const correctAnswer = opts[q.correctIndex];
+            const qSeed = seed + origIdx;
+            const shuffledOpts = seededShuffle(opts, qSeed);
+            const shuffledCorrectIndex = shuffledOpts.indexOf(correctAnswer);
+            return {
+              text: q.text || "",
+              imageUrl: q.imageUrl || undefined,
+              options: opts as [string, string, string, string],
+              correctIndex: q.correctIndex,
+              shuffledOptions: shuffledOpts,
+              shuffledCorrectIndex,
+            };
+          }),
+          seed,
+        );
 
-  if (!started) {
+        const examData: Exam = {
+          id: snap.id,
+          title: data.title || "Untitled Exam",
+          subject: data.subject || "",
+          classLevel: data.classLevel || 0,
+          duration: data.duration || 30,
+          timerEnabled: data.timerEnabled ?? true,
+          autoSubmit: data.autoSubmit ?? true,
+          examPassword: data.examPassword || "",
+          questions: shuffledQuestions,
+          teacherId: data.teacherId || "",
+          teacherName: data.teacherName || "",
+        };
+
+        setExam(examData);
+        setTimeLeft((data.duration || 30) * 60);
+        setNeedsPassword(Boolean(data.examPassword));
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load exam. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadExam();
+  }, [examId, user?.id]);
+
+  // Timer
+  useEffect(() => {
+    if (!started || !exam?.timerEnabled || submitted) return;
+    timerRef.current = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(timerRef.current!);
+          if (exam.autoSubmit) handleSubmit(true);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [started, submitted]);
+
+  // Exit detection
+  useEffect(() => {
+    if (!started || submitted) return;
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        violationCountRef.current += 1;
+        if (violationCountRef.current >= 2) {
+          handleSubmit(true, "Tab switched multiple times");
+        } else {
+          toast.error("⚠️ Warning! Do not leave the exam window. This has been recorded.");
+        }
+      }
+    }
+
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+      handleSubmit(true, "Browser closed/refreshed");
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [started, submitted, answers]);
+
+  function checkPassword() {
+    if (!exam) return;
+    if (passwordInput.trim() === exam.examPassword?.trim()) {
+      setNeedsPassword(false);
+      setPasswordError("");
+    } else {
+      setPasswordError("Incorrect password. Please try again.");
+    }
+  }
+
+  async function handleSubmit(auto = false, violationType?: string) {
+    if (submitting || submitted || !exam || !user) return;
+    setSubmitting(true);
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    try {
+      // Calculate score using shuffled correct index
+      let correct = 0;
+      exam.questions.forEach((q, i) => {
+        if (answers[i] !== undefined && answers[i] === q.shuffledCorrectIndex) {
+          correct++;
+        }
+      });
+      const total = exam.questions.length;
+      const percentage = Math.round((correct / total) * 100);
+
+      // Save result to Firestore
+      await addDoc(collection(db, "results"), {
+        examId: exam.id,
+        examTitle: exam.title,
+        subject: exam.subject,
+        studentId: user.id,
+        studentName: user.fullName,
+        studentClass: user.classLevel,
+        teacherId: exam.teacherId,
+        score: correct,
+        total,
+        percentage,
+        answers,
+        autoSubmitted: auto,
+        exitViolation: Boolean(violationType),
+        violationType: violationType || null,
+        submittedAt: serverTimestamp(),
+      });
+
+      // Save notification for teacher
+      await addDoc(collection(db, "notifications"), {
+        teacherId: exam.teacherId,
+        studentName: user.fullName,
+        studentClass: user.classLevel,
+        examTitle: exam.title,
+        examId: exam.id,
+        score: correct,
+        total,
+        percentage,
+        exitViolation: Boolean(violationType),
+        violationType: violationType || null,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+
+      setScore({ correct, total });
+      setSubmitted(true);
+
+      if (auto) {
+        toast.error("⚠️ Exam auto-submitted due to exit violation");
+      } else {
+        toast.success("✅ Exam submitted successfully!");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to submit. Please try again.");
+      setSubmitting(false);
+    }
+  }
+
+  // Loading state
+  if (loading) {
     return (
-      <div className="min-h-[100dvh] flex flex-col items-center justify-center p-4 bg-background">
-        <div className="glass p-8 rounded-2xl max-w-lg w-full text-center space-y-6">
-          <div className="mx-auto w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-primary mb-4">
-            <Clock className="w-8 h-8" />
-          </div>
-          <h1 className="text-3xl font-display font-bold">{dummyExam.title}</h1>
-          <p className="text-muted-foreground text-lg">Duration: {dummyExam.durationMinutes} minutes</p>
-          
-          <div className="bg-destructive/10 text-destructive p-4 rounded-xl text-sm text-left flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <p>Do not switch tabs or leave this window. Doing so will result in an automatic submission and a violation report.</p>
-          </div>
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground">Loading exam...</p>
+        </div>
+      </div>
+    );
+  }
 
-          <Button size="lg" className="w-full text-lg h-14 bg-primary hover:bg-primary/90" onClick={handleStart}>
-            <Play className="w-5 h-5 mr-2" /> Begin Exam
+  // Error state
+  if (error || !exam) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background p-4">
+        <div className="glass p-8 rounded-2xl max-w-md w-full text-center space-y-4">
+          <AlertTriangle className="w-12 h-12 text-red-400 mx-auto" />
+          <h2 className="text-xl font-bold">Exam Unavailable</h2>
+          <p className="text-muted-foreground">{error || "Something went wrong"}</p>
+          <Button onClick={() => navigate("/student/exams")}>
+            Back to Exams
           </Button>
         </div>
       </div>
     );
   }
 
-  const question = dummyExam.questions[currentQ];
-  const isLast = currentQ === dummyExam.questions.length - 1;
+  // Password screen
+  if (needsPassword) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass p-8 rounded-2xl max-w-md w-full space-y-5"
+        >
+          <div className="text-center space-y-2">
+            <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
+              <Clock className="w-7 h-7 text-primary" />
+            </div>
+            <h1 className="text-2xl font-display font-bold">{exam.title}</h1>
+            <p className="text-muted-foreground text-sm">
+              This exam is password protected. Enter the password given by your teacher.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Input
+              type="password"
+              placeholder="Enter exam password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && checkPassword()}
+            />
+            {passwordError && (
+              <p className="text-red-400 text-sm">{passwordError}</p>
+            )}
+          </div>
+          <Button className="w-full" onClick={checkPassword}>
+            Enter Exam
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Results screen
+  if (submitted && score) {
+    const percentage = Math.round((score.correct / score.total) * 100);
+    const passed = percentage >= 50;
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass p-8 rounded-2xl max-w-2xl w-full space-y-6"
+        >
+          <div className="text-center space-y-3">
+            {passed
+              ? <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto" />
+              : <AlertTriangle className="w-16 h-16 text-red-400 mx-auto" />
+            }
+            <h1 className="text-3xl font-display font-bold">
+              {passed ? "🎉 Congratulations!" : "Better luck next time!"}
+            </h1>
+            <p className="text-5xl font-bold text-primary">{percentage}%</p>
+            <p className="text-muted-foreground">
+              You scored {score.correct} out of {score.total} questions correctly
+            </p>
+            <span className={`inline-block px-4 py-1 rounded-full text-sm font-medium ${
+              passed ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+            }`}>
+              {passed ? "✅ PASSED" : "❌ FAILED"}
+            </span>
+          </div>
+
+          {/* Question review */}
+          <div className="space-y-3 max-h-[40vh] overflow-y-auto">
+            <h3 className="font-semibold">Question Review:</h3>
+            {exam.questions.map((q, i) => {
+              const studentAnswer = answers[i];
+              const isCorrect = studentAnswer === q.shuffledCorrectIndex;
+              const shuffled = q.shuffledOptions || q.options;
+              return (
+                <div key={i} className={`p-4 rounded-xl border ${
+                  isCorrect ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/30 bg-red-500/5"
+                }`}>
+                  <p className="font-medium text-sm mb-2">
+                    Q{i + 1}. {q.text}
+                  </p>
+                  {q.imageUrl && (
+                    <img src={q.imageUrl} alt="" className="max-h-32 rounded-lg mb-2 object-contain" />
+                  )}
+                  <div className="space-y-1 text-sm">
+                    {shuffled.map((opt, oi) => (
+                      <p key={oi} className={
+                        oi === q.shuffledCorrectIndex
+                          ? "text-emerald-400 font-medium"
+                          : studentAnswer === oi && !isCorrect
+                          ? "text-red-400"
+                          : "text-muted-foreground"
+                      }>
+                        {OPTION_LABELS[oi]}. {opt}
+                        {oi === q.shuffledCorrectIndex && " ✓ Correct"}
+                        {studentAnswer === oi && !isCorrect && " ✗ Your answer"}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <Button className="w-full" onClick={() => navigate("/student")}>
+            Back to Dashboard
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Pre-exam instructions screen
+  if (!started) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass p-8 rounded-2xl max-w-lg w-full text-center space-y-6"
+        >
+          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
+            <Clock className="w-8 h-8 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-display font-bold">{exam.title}</h1>
+            <p className="text-muted-foreground mt-1">{exam.subject} · Class {exam.classLevel}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="glass p-3 rounded-xl">
+              <p className="text-muted-foreground">Questions</p>
+              <p className="font-bold text-lg">{exam.questions.length}</p>
+            </div>
+            <div className="glass p-3 rounded-xl">
+              <p className="text-muted-foreground">Duration</p>
+              <p className="font-bold text-lg">
+                {exam.timerEnabled ? `${exam.duration} min` : "No limit"}
+              </p>
+            </div>
+          </div>
+          <div className="bg-destructive/10 text-destructive p-4 rounded-xl text-sm text-left flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            <p>
+              Do not switch tabs or leave this window during the exam.
+              Violations will be reported to your teacher and may result
+              in automatic submission.
+            </p>
+          </div>
+          <Button
+            size="lg"
+            className="w-full text-lg h-14 bg-primary hover:bg-primary/90"
+            onClick={() => setStarted(true)}
+          >
+            <Play className="w-5 h-5 mr-2" /> Begin Exam
+          </Button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Exam screen
+  const question = exam.questions[currentQ];
+  const shuffledOpts = question.shuffledOptions || question.options;
+  const isLast = currentQ === exam.questions.length - 1;
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+  const timerRed = timeLeft < 60;
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
+      {/* Header */}
       <header className="h-16 glass border-b border-border/50 flex items-center justify-between px-6 sticky top-0 z-50">
-        <div className="font-display font-bold">EDU PORTAL</div>
-        <div className="flex items-center gap-2 font-mono text-lg text-primary">
-          <Clock className="w-5 h-5" />
-          {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+        <div className="font-display font-bold text-sm md:text-base">
+          {exam.title}
         </div>
+        {exam.timerEnabled && (
+          <div className={`flex items-center gap-2 font-mono text-lg font-bold px-3 py-1 rounded-lg transition-colors ${
+            timerRed
+              ? "text-red-400 bg-red-500/10 animate-pulse"
+              : "text-primary"
+          }`}>
+            <Clock className="w-5 h-5" />
+            {mins}:{secs.toString().padStart(2, "0")}
+          </div>
+        )}
       </header>
 
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-3xl flex flex-col">
-        <div className="flex justify-between items-center mb-8">
-          <span className="text-muted-foreground font-medium">Question {currentQ + 1} of {dummyExam.questions.length}</span>
+      <main className="flex-1 container mx-auto px-4 py-6 max-w-3xl flex flex-col gap-6">
+        {/* Progress */}
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground text-sm font-medium">
+            Question {currentQ + 1} of {exam.questions.length}
+          </span>
           <div className="flex gap-1">
-            {dummyExam.questions.map((_, idx) => (
-              <div key={idx} className={`w-2 h-2 rounded-full ${idx === currentQ ? 'bg-primary' : answers[dummyExam.questions[idx].id] ? 'bg-primary/40' : 'bg-border'}`} />
+            {exam.questions.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentQ(idx)}
+                className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                  idx === currentQ
+                    ? "bg-primary scale-125"
+                    : answers[idx] !== undefined
+                    ? "bg-primary/40"
+                    : "bg-border"
+                }`}
+              />
             ))}
           </div>
         </div>
 
-        <motion.div 
-          key={currentQ}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="glass p-8 rounded-3xl flex-1 flex flex-col"
-        >
-          <h2 className="text-2xl font-medium mb-8 leading-relaxed">{question.text}</h2>
-          
-          <div className="space-y-4 mt-auto">
-            {Object.entries(question.options).map(([key, val]) => (
-              <button
-                key={key}
-                onClick={() => handleSelectOption(key)}
-                className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-4 ${
-                  answers[question.id] === key 
-                    ? "border-primary bg-primary/10" 
-                    : "border-border hover:border-primary/50 hover:bg-muted/50"
-                }`}
-              >
-                <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${
-                  answers[question.id] === key ? "bg-primary text-white" : "bg-muted text-muted-foreground"
-                }`}>
-                  {key}
-                </span>
-                <span className="text-lg">{val}</span>
-              </button>
-            ))}
-          </div>
-        </motion.div>
+        {/* Question card */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentQ}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+            className="glass p-6 md:p-8 rounded-3xl flex-1 flex flex-col gap-6"
+          >
+            {/* Question image */}
+            {question.imageUrl && (
+              <img
+                src={question.imageUrl}
+                alt="Question"
+                className="max-h-60 rounded-xl object-contain border border-border"
+              />
+            )}
 
-        <div className="flex justify-between items-center mt-8">
-          <Button variant="outline" size="lg" disabled={currentQ === 0} onClick={() => setCurrentQ(c => c - 1)}>
-            Previous
+            {/* Question text */}
+            <h2 className="text-xl md:text-2xl font-medium leading-relaxed">
+              {question.text}
+            </h2>
+
+            {/* Options */}
+            <div className="space-y-3 mt-auto">
+              {shuffledOpts.map((opt, i) => {
+                const lbl = OPTION_LABELS[i];
+                const isSelected = answers[currentQ] === i;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setAnswers((prev) => ({ ...prev, [currentQ]: i }))}
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-4 ${
+                      isSelected
+                        ? "border-primary bg-primary/10 shadow-[0_0_15px_rgba(124,58,237,0.3)]"
+                        : `${OPTION_COLORS[lbl]} hover:border-primary/50`
+                    }`}
+                  >
+                    <span className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white ${
+                      isSelected ? "bg-primary" : OPTION_CHIPS[lbl]
+                    }`}>
+                      {lbl}
+                    </span>
+                    <span className="text-base">{opt}</span>
+                    {isSelected && (
+                      <CheckCircle2 className="w-5 h-5 text-primary ml-auto" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Navigation */}
+        <div className="flex justify-between items-center">
+          <Button
+            variant="outline"
+            size="lg"
+            disabled={currentQ === 0}
+            onClick={() => setCurrentQ((c) => c - 1)}
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" /> Previous
           </Button>
-          
+
           {isLast ? (
-            <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground px-8" onClick={handleSubmit}>
-              Submit Exam
+            <Button
+              size="lg"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-8"
+              onClick={() => {
+                const unanswered = exam.questions.length - Object.keys(answers).length;
+                if (unanswered > 0) {
+                  toast.error(`You have ${unanswered} unanswered question${unanswered > 1 ? "s" : ""}. Are you sure?`);
+                  setTimeout(() => handleSubmit(false), 3000);
+                } else {
+                  handleSubmit(false);
+                }
+              }}
+              disabled={submitting}
+            >
+              {submitting
+                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                : null}
+              Submit Exam ✓
             </Button>
           ) : (
-            <Button size="lg" onClick={() => setCurrentQ(c => c + 1)}>
-              Next Question
+            <Button
+              size="lg"
+              onClick={() => setCurrentQ((c) => c + 1)}
+            >
+              Next <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           )}
         </div>
