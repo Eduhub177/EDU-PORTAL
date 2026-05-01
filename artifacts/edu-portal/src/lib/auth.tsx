@@ -1,7 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
-import { doc, setDoc, getDoc, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "./firebase";
-import { toast } from "sonner";
 
 export type UserRole = "teacher" | "student";
 
@@ -32,29 +31,7 @@ export async function hashPassword(password: string): Promise<string> {
   const msgBuffer = new TextEncoder().encode(password);
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-export function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-export async function requestSignupOtp(phone: string) {
-  if (!isFirebaseConfigured) {
-    toast.success("Demo OTP: 123456 — In production, send via Twilio / Firebase Phone Auth.");
-    return "123456";
-  }
-  const code = generateOtp();
-  const otpId = `otp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  await setDoc(doc(db, "otps", otpId), {
-    phone,
-    code,
-    purpose: "signup",
-    consumed: false,
-    createdAt: serverTimestamp()
-  });
-  toast.success(`Demo OTP: ${code} — In production, send via Twilio / Firebase Phone Auth.`);
-  return code;
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -62,39 +39,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Check localStorage for saved session
     const uid = localStorage.getItem("eduportal:uid");
+
     if (!uid || !isFirebaseConfigured) {
       setLoading(false);
       return;
     }
 
-    const unsubscribe = onSnapshot(doc(db, "users", uid), (docSnap) => {
-      if (docSnap.exists()) {
-        setUser({ id: docSnap.id, ...docSnap.data() } as User);
-      } else {
-        setUser(null);
-        localStorage.removeItem("eduportal:uid");
+    // Real-time listener — keeps user logged in across sessions
+    const unsubscribe = onSnapshot(
+      doc(db, "users", uid),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const userData = { id: docSnap.id, ...docSnap.data() } as User;
+          setUser(userData);
+          // Keep role in localStorage for quick access
+          localStorage.setItem("eduportal:role", userData.role);
+        } else {
+          // User document deleted — clear session
+          setUser(null);
+          localStorage.removeItem("eduportal:uid");
+          localStorage.removeItem("eduportal:role");
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Auth listener error:", err);
+        // On error still try to load from cache
+        setLoading(false);
       }
-      setLoading(false);
-    }, (err) => {
-      console.error("Auth listener error:", err);
-      setLoading(false);
-    });
+    );
 
     return () => unsubscribe();
   }, []);
 
   const signOut = () => {
     localStorage.removeItem("eduportal:uid");
+    localStorage.removeItem("eduportal:role");
     setUser(null);
+    window.location.href = "/";
   };
 
   const refreshUser = async () => {
     const uid = localStorage.getItem("eduportal:uid");
     if (!uid || !isFirebaseConfigured) return;
-    const docSnap = await getDoc(doc(db, "users", uid));
-    if (docSnap.exists()) {
-      setUser({ id: docSnap.id, ...docSnap.data() } as User);
+    try {
+      const docSnap = await getDoc(doc(db, "users", uid));
+      if (docSnap.exists()) {
+        setUser({ id: docSnap.id, ...docSnap.data() } as User);
+      }
+    } catch (err) {
+      console.error("Refresh user error:", err);
     }
   };
 
