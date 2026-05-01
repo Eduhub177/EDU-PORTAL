@@ -163,18 +163,32 @@ export default function CreateExam() {
     saveTimerRef.current = setTimeout(async () => {
       try {
         setSaveState("saving");
+        
+        // Clean questions — remove undefined values Firestore rejects
+        const cleanQuestions = questions.map((q) => ({
+          text: q.text || "",
+          imageUrl: q.imageUrl || null,
+          options: [
+            q.options[0] || "",
+            q.options[1] || "",
+            q.options[2] || "",
+            q.options[3] || "",
+          ],
+          correctIndex: q.correctIndex ?? -1,
+        }));
+
         const payload = {
-          title: title.trim(),
-          subject,
-          classLevel: Number(classLevel),
-          examPassword: examPassword.trim(),
+          title: title.trim() || "",
+          subject: subject || "",
+          classLevel: Number(classLevel) || 6,
+          examPassword: examPassword.trim() || "",
           status: "draft" as const,
-          timerEnabled,
-          duration,
-          autoSubmit,
-          questions,
-          teacherId: user.id,
-          teacherName: user.fullName,
+          timerEnabled: timerEnabled ?? true,
+          duration: duration || 30,
+          autoSubmit: autoSubmit ?? true,
+          questions: cleanQuestions,
+          teacherId: user.id || "",
+          teacherName: user.fullName || "",
           updatedAt: serverTimestamp(),
         };
         if (!docId) {
